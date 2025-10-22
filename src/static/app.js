@@ -21,22 +21,37 @@ document.addEventListener("DOMContentLoaded", () => {
       const response = await fetch("/activities");
       const activities = await response.json();
 
-      // Clear loading message
+      // Clear loading message and previous UI
       activitiesList.innerHTML = "";
+
+      // Clear and reset activity select to avoid duplicates
+      activitySelect.innerHTML = '<option value="">-- Select an activity --</option>';
 
       // Populate activities list
       Object.entries(activities).forEach(([name, details]) => {
         const activityCard = document.createElement("div");
         activityCard.className = "activity-card";
 
-        const spotsLeft = details.max_participants - details.participants.length;
+        // Normalize participants to an array and compute spots safely
+        const participants = Array.isArray(details.participants) ? details.participants : [];
+        const maxParticipants = typeof details.max_participants === "number" ? details.max_participants : 0;
+        const spotsLeft = maxParticipants - participants.length;
 
-        // Build participants section
+        // Build participants section (support strings or objects)
         let participantsHTML = `<div class="participants"><h5>Participants</h5>`;
-        if (Array.isArray(details.participants) && details.participants.length > 0) {
+        if (participants.length > 0) {
           participantsHTML += `<ul>`;
-          participantsHTML += details.participants
-            .map((p) => `<li>${escapeHtml(p)}</li>`)
+          participantsHTML += participants
+            .map((p) => {
+              // normalize participant display
+              let display = "";
+              if (p && typeof p === "object") {
+                display = p.name || p.email || (p.id ? String(p.id) : JSON.stringify(p));
+              } else {
+                display = String(p);
+              }
+              return `<li>${escapeHtml(display)}</li>`;
+            })
             .join("");
           participantsHTML += `</ul>`;
         } else {
@@ -87,6 +102,9 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+
+        // Refresh activities so the participants list updates immediately
+        fetchActivities();
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
